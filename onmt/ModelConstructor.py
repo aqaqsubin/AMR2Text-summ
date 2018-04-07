@@ -147,6 +147,7 @@ def make_base_model(model_opt, fields, gpu, checkpoint=None):
         ("Unsupported model type %s" % (model_opt.model_type))
 
     # Make encoder.
+    # TODO: Should we add model_type "graph"
     if model_opt.model_type == "text":
         src_dict = fields["src"].vocab
         feature_dicts = onmt.io.collect_feature_vocabs(fields, 'src')

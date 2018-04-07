@@ -36,7 +36,7 @@ def make_translator(opt, report_score=True, out_file=None):
               for k in ["beam_size", "n_best", "max_length", "min_length",
                         "stepwise_penalty", "block_ngram_repeat",
                         "ignore_when_blocking", "dump_beam",
-                        "data_type", "replace_unk", "gpu", "verbose"]}
+                        "data_type", "replace_unk", "gpu", "verbose", "report_bleu"]}
 
     translator = Translator(model, fields, global_scorer=scorer,
                             out_file=out_file, report_score=report_score,
@@ -128,7 +128,7 @@ class Translator(object):
                 "log_probs": []}
 
     def translate(self, src_dir, src_path, tgt_path,
-                  batch_size, attn_debug=False):
+                  batch_size, attn_debug=False, side_path=None):
         data = onmt.io.build_dataset(self.fields,
                                      self.data_type,
                                      src_path,
@@ -138,7 +138,8 @@ class Translator(object):
                                      window_size=self.window_size,
                                      window_stride=self.window_stride,
                                      window=self.window,
-                                     use_filter_pred=self.use_filter_pred)
+                                     use_filter_pred=self.use_filter_pred,
+                                     side_path=side_path)
 
         data_iter = onmt.io.OrderedIterator(
             dataset=data, device=self.gpu,
@@ -170,7 +171,7 @@ class Translator(object):
                 n_best_preds = [" ".join(pred)
                                 for pred in trans.pred_sents[:self.n_best]]
                 self.out_file.write('\n'.join(n_best_preds) + '\n')
-                self.out_file.flush()
+                # self.out_file.flush()
 
                 if self.verbose:
                     sent_number = next(counter)
@@ -237,13 +238,13 @@ class Translator(object):
         # exclusion_list = ["<t>", "</t>", "."]
         exclusion_tokens = set([vocab.stoi[t]
                                 for t in self.ignore_when_blocking])
-
         beam = [onmt.translate.Beam(beam_size, n_best=self.n_best,
                                     cuda=self.cuda,
                                     global_scorer=self.global_scorer,
                                     pad=vocab.stoi[onmt.io.PAD_WORD],
                                     eos=vocab.stoi[onmt.io.EOS_WORD],
                                     bos=vocab.stoi[onmt.io.BOS_WORD],
+                                    period=vocab.stoi['.'],
                                     min_length=self.min_length,
                                     stepwise_penalty=self.stepwise_penalty,
                                     block_ngram_repeat=self.block_ngram_repeat,
@@ -282,6 +283,7 @@ class Translator(object):
         memory_bank = rvar(memory_bank.data)
         memory_lengths = src_lengths.repeat(beam_size)
         dec_states.repeat_beam_size_times(beam_size)
+        split_examples = [data.examples[i:i + beam_size] for i in range(0, len(data.examples), beam_size)]
 
         # (3) run the decoder to generate sentences, using beam search.
         for i in range(self.max_length):
@@ -327,9 +329,14 @@ class Translator(object):
                 out = out.log()
                 beam_attn = unbottle(attn["copy"])
             # (c) Advance each beam.
+
             for j, b in enumerate(beam):
+                side_indices = set([self.fields['tgt'].vocab.stoi[k]
+                                    for k in set(data.examples[j].side)
+                                    if k in self.fields['tgt'].vocab.itos]
+                                   + [self.fields['tgt'].vocab.stoi[self.fields['tgt'].eos_token]])
                 b.advance(out[:, j],
-                          beam_attn.data[:, j, :memory_lengths[j]])
+                          beam_attn.data[:, j, :memory_lengths[j]], side_indices)
                 dec_states.beam_update(j, b.get_current_origin(), beam_size)
 
         # (4) Extract sentences from beam.
@@ -394,14 +401,12 @@ class Translator(object):
             name, math.exp(-score_total / words_total)))
 
     def _report_bleu(self, tgt_path):
-        import subprocess
-        path = os.path.split(os.path.realpath(__file__))[0]
+        import subprocess, sys
+        path = os.path.split(os.path.realpath(sys.modules['__main__'].__file__))[0]
         print()
 
-        res = subprocess.check_output("perl %s/tools/multi-bleu.perl %s"
-                                      % (path, tgt_path, self.output),
-                                      stdin=self.out_file,
-                                      shell=True).decode("utf-8")
+        res = subprocess.run(["perl", path+"/tools/multi-bleu.perl", tgt_path],
+                             stdin=self.out_file, shell=False, check=True)
 
         print(">> " + res.strip())
 

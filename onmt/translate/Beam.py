@@ -16,7 +16,7 @@ class Beam(object):
        cuda (bool): use gpu
        global_scorer (:obj:`GlobalScorer`)
     """
-    def __init__(self, size, pad, bos, eos,
+    def __init__(self, size, pad, bos, eos, period,
                  n_best=1, cuda=False,
                  global_scorer=None,
                  min_length=0,
@@ -42,7 +42,7 @@ class Beam(object):
         # Has EOS topped the beam yet.
         self._eos = eos
         self.eos_top = False
-
+        self.period = period
         # The attentions (matrix) for each time.
         self.attn = []
 
@@ -70,7 +70,7 @@ class Beam(object):
         "Get the backpointers for the current timestep."
         return self.prev_ks[-1]
 
-    def advance(self, word_probs, attn_out):
+    def advance(self, word_probs, attn_out, side_indices):
         """
         Given prob over words for every last beam `wordLk` and attention
         `attn_out`: Compute and update the beam search.
@@ -87,14 +87,20 @@ class Beam(object):
             self.global_scorer.update_score(self, attn_out)
         # force the output to be longer than self.min_length
         cur_len = len(self.next_ys)
+        constraint = set(range(len(word_probs[0]))) - side_indices
+        for k in range(len(word_probs)):
+            for i in constraint:
+                # pass
+                word_probs[k][i] = float('-inf')
         if cur_len < self.min_length:
             for k in range(len(word_probs)):
                 word_probs[k][self._eos] = -1e20
+                word_probs[k][self.period] = -1e20
         # Sum the previous scores.
         if len(self.prev_ks) > 0:
             beam_scores = word_probs + \
-                self.scores.unsqueeze(1).expand_as(word_probs)
-            # Don't let EOS have children.
+                          self.scores.unsqueeze(1).expand_as(word_probs)
+            # Don't let EOS have children.hun
             for i in range(self.next_ys[-1].size(0)):
                 if self.next_ys[-1][i] == self._eos:
                     beam_scores[i] = -1e20

@@ -71,6 +71,7 @@ def save_fields_to_vocab(fields):
     for k, f in fields.items():
         if f is not None and 'vocab' in f.__dict__:
             f.vocab.stoi = dict(f.vocab.stoi)
+            #! k denotes the type (src or tgt)
             vocab.append((k, f.vocab))
     return vocab
 
@@ -175,7 +176,7 @@ def build_dataset(fields, data_type, src_path, tgt_path, src_dir=None,
                   src_seq_length_trunc=0, tgt_seq_length_trunc=0,
                   dynamic_dict=True, sample_rate=0,
                   window_size=0, window_stride=0, window=None,
-                  normalize_audio=True, use_filter_pred=True):
+                  normalize_audio=True, use_filter_pred=True, side_path=None):
 
     # Build src/tgt examples iterator from corpus files, also extract
     # number of features.
@@ -190,9 +191,11 @@ def build_dataset(fields, data_type, src_path, tgt_path, src_dir=None,
         TextDataset.make_text_examples_nfeats_tpl(
             tgt_path, tgt_seq_length_trunc, "tgt")
 
+    side_examples_iter, _ = TextDataset.make_text_examples_nfeats_tpl(side_path, tgt_seq_length_trunc, "side")
+
     if data_type == 'text':
-        dataset = TextDataset(fields, src_examples_iter, tgt_examples_iter,
-                              num_src_feats, num_tgt_feats,
+        dataset = TextDataset(fields, src_examples_iter, tgt_examples_iter, side_examples_iter,
+                              num_src_feats=num_src_feats, num_tgt_feats=num_tgt_feats,
                               src_seq_length=src_seq_length,
                               tgt_seq_length=tgt_seq_length,
                               dynamic_dict=dynamic_dict,
@@ -221,8 +224,7 @@ def build_dataset(fields, data_type, src_path, tgt_path, src_dir=None,
 def _build_field_vocab(field, counter, **kwargs):
     specials = list(OrderedDict.fromkeys(
         tok for tok in [field.unk_token, field.pad_token, field.init_token,
-                        field.eos_token]
-        if tok is not None))
+                        field.eos_token] if tok is not None))
     field.vocab = field.vocab_cls(counter, specials=specials, **kwargs)
 
 
@@ -363,7 +365,8 @@ class OrderedIterator(torchtext.data.Iterator):
                     p_batch = torchtext.data.batch(
                         sorted(p, key=self.sort_key),
                         self.batch_size, self.batch_size_fn)
-                    for b in random_shuffler(list(p_batch)):
+                    # for b in random_shuffler(list(p_batch)):
+                    for b in list(p_batch):
                         yield b
             self.batches = pool(self.data(), self.random_shuffler)
         else:

@@ -275,7 +275,7 @@ def train_model(model, fields, optim, data_type, model_opt):
             train_stats.log_tensorboard("valid", writer, optim.lr, epoch)
 
         # 4. Update the learning rate
-        trainer.epoch_step(valid_stats.ppl(), epoch)
+        # trainer.epoch_step(valid_stats.ppl(), epoch)
 
         # 5. Drop a checkpoint if needed.
         if epoch >= opt.start_checkpoint_at:

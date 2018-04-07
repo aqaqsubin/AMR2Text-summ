@@ -35,7 +35,7 @@ class TextDataset(ONMTDatasetBase):
             use_filter_pred (bool): use a custom filter predicate to filter
                 out examples?
     """
-    def __init__(self, fields, src_examples_iter, tgt_examples_iter,
+    def  __init__(self, fields, src_examples_iter, tgt_examples_iter, side_examples_iter=[],
                  num_src_feats=0, num_tgt_feats=0,
                  src_seq_length=0, tgt_seq_length=0,
                  dynamic_dict=True, use_filter_pred=True):
@@ -52,8 +52,12 @@ class TextDataset(ONMTDatasetBase):
         # at minimum the src tokens and their indices and potentially also
         # the src and tgt features and alignment information.
         if tgt_examples_iter is not None:
-            examples_iter = (self._join_dicts(src, tgt) for src, tgt in
-                             zip(src_examples_iter, tgt_examples_iter))
+            if side_examples_iter:
+                examples_iter = (self._join_dicts(src, tgt, side) for src, tgt, side in
+                             zip(src_examples_iter, tgt_examples_iter, side_examples_iter))
+            else:
+                examples_iter = (self._join_dicts(src, tgt) for src, tgt in
+                                 zip(src_examples_iter, tgt_examples_iter))
         else:
             examples_iter = src_examples_iter
 
@@ -139,7 +143,7 @@ class TextDataset(ONMTDatasetBase):
         Returns:
             (example_dict iterator, num_feats) tuple.
         """
-        assert side in ['src', 'tgt']
+        assert side in ['src', 'tgt', 'side']
 
         if path is None:
             return (None, 0)

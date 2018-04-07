@@ -148,7 +148,6 @@ def preprocess_opts(parser):
                        If 0, the data will be handled as a whole. The unit
                        is in bytes. Optimal value should be multiples of
                        64 bytes.""")
-
     # Dictionary options, for text corpus
 
     group = parser.add_argument_group('Vocab')
@@ -382,7 +381,7 @@ def translate_opts(parser):
     group = parser.add_argument_group('Data')
     group.add_argument('-data_type', default="text",
                        help="Type of the source input. Options: [text|img].")
-
+    group.add_argument('-side_tgt', help="Side informations word.")
     group.add_argument('-src',   required=True,
                        help="""Source sequence to decode (one line per
                        sequence)""")
