@@ -331,10 +331,13 @@ class Translator(object):
             # (c) Advance each beam.
 
             for j, b in enumerate(beam):
-                side_indices = set([self.fields['tgt'].vocab.stoi[k]
+                if hasattr(data.examples[j], 'side'):
+                    side_indices = set([self.fields['tgt'].vocab.stoi[k]
                                     for k in set(data.examples[j].side)
                                     if k in self.fields['tgt'].vocab.itos]
                                    + [self.fields['tgt'].vocab.stoi[self.fields['tgt'].eos_token]])
+                else:
+                    side_indices = None
                 b.advance(out[:, j],
                           beam_attn.data[:, j, :memory_lengths[j]], side_indices)
                 dec_states.beam_update(j, b.get_current_origin(), beam_size)

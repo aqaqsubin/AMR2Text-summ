@@ -87,11 +87,11 @@ class Beam(object):
             self.global_scorer.update_score(self, attn_out)
         # force the output to be longer than self.min_length
         cur_len = len(self.next_ys)
-        constraint = set(range(len(word_probs[0]))) - side_indices
-        for k in range(len(word_probs)):
-            for i in constraint:
-                # pass
-                word_probs[k][i] = float('-inf')
+        if side_indices:
+            constraint = set(range(len(word_probs[0]))) - side_indices
+            for k in range(len(word_probs)):
+                for i in constraint:
+                    word_probs[k][i] = float('-inf')
         if cur_len < self.min_length:
             for k in range(len(word_probs)):
                 word_probs[k][self._eos] = -1e20
