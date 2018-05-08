@@ -1,5 +1,5 @@
 from __future__ import division, unicode_literals
-
+import re
 import torch
 import onmt.io
 
@@ -27,7 +27,7 @@ class TranslationBuilder(object):
         self.replace_unk = replace_unk
         self.has_tgt = has_tgt
 
-    def _build_target_tokens(self, src, src_vocab, src_raw, pred, attn):
+    def _build_target_tokens(self, src, src_vocab, src_raw, pred, attn, b):
         vocab = self.fields["tgt"].vocab
         tokens = []
         for tok in pred:
@@ -40,9 +40,35 @@ class TranslationBuilder(object):
                 break
         if self.replace_unk and (attn is not None) and (src is not None):
             for i in range(len(tokens)):
+                phrase_table = None
+                if hasattr(self.data.examples[b], 'phrase_table'):
+                    phrase_table = {
+                        s.split('|||')[0]: s.split('|||')[1]
+                        for s in self.data.examples[b].phrase_table
+                    }
+                    for key, item in phrase_table.items():
+                        if 'name' in key:
+                            phrase_table[key] = ' '.join(item.split('_')[1:])
+                # pattern = re.compile(r'.*_?(name|entity|num)_[0-9]$')
+                # if pattern.match(tokens[i]):
+                #     if phrase_table and tokens[i] in phrase_table:
+                #         tokens[i] = phrase_table[tokens[i]]
+                #     else:
+                #         tokens[i] = vocab.itos[onmt.io.UNK]
                 if tokens[i] == vocab.itos[onmt.io.UNK]:
-                    _, maxIndex = attn[i].max(0)
-                    tokens[i] = src_raw[maxIndex[0]]
+                    src_idx = attn[i].max(0)[1][0]
+                    if phrase_table and src_raw[src_idx] in phrase_table:
+                        tokens[i] = phrase_table[src_raw[src_idx]]
+                    elif hasattr(self.data, 'global_phrase_table') \
+                            and src_raw[src_idx] in self.data.global_phrase_table:
+                        tokens[i] = self.data.global_phrase_table[src_raw[src_idx]]
+                    else:
+                        tokens[i] = src_raw[src_idx]
+                if tokens[i] == '-lrb-':
+                    tokens[i] = '('
+                if tokens[i] == '-rrb-':
+                    tokens[i] = ')'
+                # tokens[i] = tokens[i] + '_' + str(i)
         return tokens
 
     def from_batch(self, translation_batch):
@@ -84,14 +110,14 @@ class TranslationBuilder(object):
             pred_sents = [self._build_target_tokens(
                 src[:, b] if src is not None else None,
                 src_vocab, src_raw,
-                preds[b][n], attn[b][n])
+                preds[b][n], attn[b][n], b)
                           for n in range(self.n_best)]
             gold_sent = None
             if tgt is not None:
                 gold_sent = self._build_target_tokens(
                     src[:, b] if src is not None else None,
                     src_vocab, src_raw,
-                    tgt[1:, b] if tgt is not None else None, None)
+                    tgt[1:, b] if tgt is not None else None, None, b)
 
             translation = Translation(src[:, b] if src is not None else None,
                                       src_raw, pred_sents,

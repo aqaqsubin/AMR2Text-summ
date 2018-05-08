@@ -127,7 +127,7 @@ class Translator(object):
                 "scores": [],
                 "log_probs": []}
 
-    def translate(self, src_dir, src_path, tgt_path,
+    def translate(self, src_dir, src_path, tgt_path, phrase_table, global_phrase_table,
                   batch_size, attn_debug=False, side_path=None):
         data = onmt.io.build_dataset(self.fields,
                                      self.data_type,
@@ -139,7 +139,9 @@ class Translator(object):
                                      window_stride=self.window_stride,
                                      window=self.window,
                                      use_filter_pred=self.use_filter_pred,
-                                     side_path=side_path)
+                                     side_path=side_path,
+                                     phrase_table=phrase_table,
+                                     global_phrase_table=global_phrase_table)
 
         data_iter = onmt.io.OrderedIterator(
             dataset=data, device=self.gpu,
@@ -283,7 +285,6 @@ class Translator(object):
         memory_bank = rvar(memory_bank.data)
         memory_lengths = src_lengths.repeat(beam_size)
         dec_states.repeat_beam_size_times(beam_size)
-        split_examples = [data.examples[i:i + beam_size] for i in range(0, len(data.examples), beam_size)]
 
         # (3) run the decoder to generate sentences, using beam search.
         for i in range(self.max_length):

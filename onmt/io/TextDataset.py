@@ -35,11 +35,20 @@ class TextDataset(ONMTDatasetBase):
             use_filter_pred (bool): use a custom filter predicate to filter
                 out examples?
     """
-    def  __init__(self, fields, src_examples_iter, tgt_examples_iter, side_examples_iter=[],
+    def  __init__(self, fields, src_examples_iter, tgt_examples_iter,
+                  side_examples_iter=[], phrase_table_iter=[], global_phrase_table=None,
                  num_src_feats=0, num_tgt_feats=0,
                  src_seq_length=0, tgt_seq_length=0,
                  dynamic_dict=True, use_filter_pred=True):
         self.data_type = 'text'
+        if global_phrase_table:
+            global_phrase_table_iter = (ex for ex, nfeats in
+                                        TextDataset.read_text_file(
+                                            global_phrase_table, side='phrase_table'))
+            self.global_phrase_table = {
+                s['phrase_table'][0].split('|||')[0]:
+                    s['phrase_table'][0].split('|||')[1] for s in global_phrase_table_iter
+            }
 
         # self.src_vocabs: mutated in dynamic_dict, used in
         # collapse_copy_scores and in Translator.py
@@ -52,9 +61,17 @@ class TextDataset(ONMTDatasetBase):
         # at minimum the src tokens and their indices and potentially also
         # the src and tgt features and alignment information.
         if tgt_examples_iter is not None:
-            if side_examples_iter:
+            if side_examples_iter and phrase_table_iter:
+                examples_iter = (self._join_dicts(src, tgt, side, phrase_table)
+                                 for src, tgt, side, phrase_table in
+                                 zip(src_examples_iter, tgt_examples_iter,
+                                     side_examples_iter, phrase_table_iter))
+            elif side_examples_iter:
                 examples_iter = (self._join_dicts(src, tgt, side) for src, tgt, side in
                              zip(src_examples_iter, tgt_examples_iter, side_examples_iter))
+            elif phrase_table_iter:
+                examples_iter = (self._join_dicts(src, tgt, phrase_table) for src, tgt, phrase_table in
+                             zip(src_examples_iter, tgt_examples_iter, phrase_table_iter))
             else:
                 examples_iter = (self._join_dicts(src, tgt) for src, tgt in
                                  zip(src_examples_iter, tgt_examples_iter))
@@ -143,7 +160,7 @@ class TextDataset(ONMTDatasetBase):
         Returns:
             (example_dict iterator, num_feats) tuple.
         """
-        assert side in ['src', 'tgt', 'side']
+        assert side in ['src', 'tgt', 'side', 'phrase_table']
 
         if path is None:
             return (None, 0)
@@ -163,7 +180,7 @@ class TextDataset(ONMTDatasetBase):
         return (examples_iter, num_feats)
 
     @staticmethod
-    def read_text_file(path, truncate, side):
+    def read_text_file(path, truncate=None, side=None):
         """
         Args:
             path (str): location of a src or tgt file.
@@ -175,7 +192,10 @@ class TextDataset(ONMTDatasetBase):
         """
         with codecs.open(path, "r", "utf-8") as corpus_file:
             for i, line in enumerate(corpus_file):
-                line = line.strip().split()
+                if side == 'phrase_table':
+                    line = line.strip().split('\t')
+                else:
+                    line = line.strip().split()
                 if truncate:
                     line = line[:truncate]
 

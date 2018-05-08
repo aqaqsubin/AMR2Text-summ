@@ -110,5 +110,5 @@ ENV/
 
 # Tensorboard
 runs/
-/scripts/
-/notes/
+scripts/
+notes/

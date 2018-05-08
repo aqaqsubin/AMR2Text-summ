@@ -382,6 +382,8 @@ def translate_opts(parser):
     group.add_argument('-data_type', default="text",
                        help="Type of the source input. Options: [text|img].")
     group.add_argument('-side_tgt', help="Side informations word.")
+    group.add_argument('-phrase_table', help='Path to source-target dictionary to replace `<unk>` tokens.')
+    group.add_argument('-global_phrase_table', help='Path to source-target dictionary')
     group.add_argument('-src',   required=True,
                        help="""Source sequence to decode (one line per
                        sequence)""")
