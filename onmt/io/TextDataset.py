@@ -84,9 +84,12 @@ class TextDataset(ONMTDatasetBase):
         # Peek at the first to see which fields are used.
         ex, examples_iter = self._peek(examples_iter)
         keys = ex.keys()
-
-        out_fields = [(k, fields[k]) if k in fields else (k, None)
-                      for k in keys]
+        out_fields = []
+        for k in keys:
+            if k in fields:
+                out_fields.append((k, fields[k]))
+            elif k == 'side':
+                out_fields.append(('side', torchtext.data.RawField()))
         example_values = ([ex[k] for k in keys] for ex in examples_iter)
 
         # If out_examples is a generator, we need to save the filter_pred
