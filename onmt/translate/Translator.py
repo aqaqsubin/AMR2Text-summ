@@ -332,9 +332,9 @@ class Translator(object):
             # (c) Advance each beam.
 
             for j, b in enumerate(beam):
-                if hasattr(data.examples[j], 'side'):
+                if hasattr(batch, 'side'):
                     side_indices = set([self.fields['tgt'].vocab.stoi[k]
-                                    for k in set(data.examples[j].side)
+                                    for k in set(batch.side[j])
                                     if k in self.fields['tgt'].vocab.itos]
                                    + [self.fields['tgt'].vocab.stoi[self.fields['tgt'].eos_token]])
                 else:
