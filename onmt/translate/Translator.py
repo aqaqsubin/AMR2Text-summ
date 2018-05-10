@@ -128,7 +128,7 @@ class Translator(object):
                 "log_probs": []}
 
     def translate(self, src_dir, src_path, tgt_path, phrase_table, global_phrase_table,
-                  batch_size, attn_debug=False, side_path=None):
+                  batch_size, attn_debug=False, side_path=None, oracle=False):
         data = onmt.io.build_dataset(self.fields,
                                      self.data_type,
                                      src_path,
@@ -159,7 +159,7 @@ class Translator(object):
 
         all_scores = []
         for batch in data_iter:
-            batch_data = self.translate_batch(batch, data)
+            batch_data = self.translate_batch(batch, data, oracle)
             translations = builder.from_batch(batch_data)
 
             for trans in translations:
@@ -214,7 +214,7 @@ class Translator(object):
                       codecs.open(self.dump_beam, 'w', 'utf-8'))
         return all_scores
 
-    def translate_batch(self, batch, data):
+    def translate_batch(self, batch, data, oracle=False):
         """
         Translate a batch of sentences.
 
@@ -333,10 +333,15 @@ class Translator(object):
 
             for j, b in enumerate(beam):
                 if hasattr(batch, 'side'):
-                    side_indices = set([self.fields['tgt'].vocab.stoi[k]
-                                    for k in set(batch.side[j])
-                                    if k in self.fields['tgt'].vocab.itos]
-                                   + [self.fields['tgt'].vocab.stoi[self.fields['tgt'].eos_token]])
+                    if oracle:
+                        gold = [word for word in data.examples[0].tgt if word in batch.side[j]]
+                        side_indices = set([self.fields['tgt'].vocab.stoi[k]
+                                        for k in gold
+                                        if k in self.fields['tgt'].vocab.itos])
+                    else:
+                        side_indices = set([self.fields['tgt'].vocab.stoi[k]
+                                        for k in set(batch.side[j])
+                                        if k in self.fields['tgt'].vocab.itos])
                 else:
                     side_indices = None
                 b.advance(out[:, j],

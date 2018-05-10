@@ -90,8 +90,9 @@ class Beam(object):
         if side_indices:
             constraint = set(range(len(word_probs[0]))) - side_indices
             for k in range(len(word_probs)):
-                for i in constraint:
-                    word_probs[k][i] = float('-inf')
+                # for i in constraint:
+                for i in side_indices:
+                    word_probs[k][i] = word_probs[k][i] + 1
         if cur_len < self.min_length:
             for k in range(len(word_probs)):
                 word_probs[k][self._eos] = -1e20
