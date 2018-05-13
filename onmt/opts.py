@@ -381,7 +381,8 @@ def translate_opts(parser):
     group = parser.add_argument_group('Data')
     group.add_argument('-data_type', default="text",
                        help="Type of the source input. Options: [text|img].")
-    group.add_argument('-side_tgt', help="Side informations word.")
+    group.add_argument('-side_src', help="Path to side information source.")
+    group.add_argument('-side_tgt', help="Path to side information target.")
     group.add_argument('-phrase_table', help='Path to source-target dictionary to replace `<unk>` tokens.')
     group.add_argument('-global_phrase_table', help='Path to source-target dictionary')
     group.add_argument('-src',   required=True,

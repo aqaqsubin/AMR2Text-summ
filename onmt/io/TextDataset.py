@@ -36,10 +36,11 @@ class TextDataset(ONMTDatasetBase):
                 out examples?
     """
     def  __init__(self, fields, src_examples_iter, tgt_examples_iter,
-                  side_examples_iter=[], phrase_table_iter=[], global_phrase_table=None,
-                 num_src_feats=0, num_tgt_feats=0,
-                 src_seq_length=0, tgt_seq_length=0,
-                 dynamic_dict=True, use_filter_pred=True):
+                  side_src_examples_iter=[], side_tgt_examples_iter=[],
+                  phrase_table_iter=[], global_phrase_table=None,
+                  num_src_feats=0, num_tgt_feats=0,
+                  src_seq_length=0, tgt_seq_length=0,
+                  dynamic_dict=True, use_filter_pred=True):
         self.data_type = 'text'
         if global_phrase_table:
             global_phrase_table_iter = (ex for ex, nfeats in
@@ -61,14 +62,15 @@ class TextDataset(ONMTDatasetBase):
         # at minimum the src tokens and their indices and potentially also
         # the src and tgt features and alignment information.
         if tgt_examples_iter is not None:
-            if side_examples_iter and phrase_table_iter:
-                examples_iter = (self._join_dicts(src, tgt, side, phrase_table)
-                                 for src, tgt, side, phrase_table in
+            if side_tgt_examples_iter and side_src_examples_iter and phrase_table_iter:
+                examples_iter = (self._join_dicts(src, tgt, side_src, side_tgt, phrase_table)
+                                 for src, tgt, side_src, side_tgt, phrase_table in
+                                 zip(src_examples_iter, tgt_examples_iter, side_src_examples_iter,
+                                     side_tgt_examples_iter, phrase_table_iter))
+            elif side_tgt_examples_iter and side_src_examples_iter:
+                examples_iter = (self._join_dicts(src, tgt, side_src, side_tgt) for src, tgt, side_src, side_tgt in
                                  zip(src_examples_iter, tgt_examples_iter,
-                                     side_examples_iter, phrase_table_iter))
-            elif side_examples_iter:
-                examples_iter = (self._join_dicts(src, tgt, side) for src, tgt, side in
-                             zip(src_examples_iter, tgt_examples_iter, side_examples_iter))
+                                     side_src_examples_iter, side_tgt_examples_iter))
             elif phrase_table_iter:
                 examples_iter = (self._join_dicts(src, tgt, phrase_table) for src, tgt, phrase_table in
                              zip(src_examples_iter, tgt_examples_iter, phrase_table_iter))
@@ -88,8 +90,8 @@ class TextDataset(ONMTDatasetBase):
         for k in keys:
             if k in fields:
                 out_fields.append((k, fields[k]))
-            elif k == 'side':
-                out_fields.append(('side', torchtext.data.RawField()))
+            elif 'side' in k:
+                out_fields.append((k, torchtext.data.RawField()))
         example_values = ([ex[k] for k in keys] for ex in examples_iter)
 
         # If out_examples is a generator, we need to save the filter_pred
@@ -163,7 +165,7 @@ class TextDataset(ONMTDatasetBase):
         Returns:
             (example_dict iterator, num_feats) tuple.
         """
-        assert side in ['src', 'tgt', 'side', 'phrase_table']
+        assert side in ['src', 'tgt', 'side_src', 'side_tgt', 'phrase_table']
 
         if path is None:
             return (None, 0)
@@ -197,8 +199,10 @@ class TextDataset(ONMTDatasetBase):
             for i, line in enumerate(corpus_file):
                 if side == 'phrase_table':
                     line = line.strip().split('\t')
-                elif side == 'side':
-                    line = ' '.join(['<s> ' + s for s in sent_tokenize(line)]).strip().split()
+                elif side == 'side_tgt':
+                    line = ['<s> ' + s for s in sent_tokenize(line)]
+                elif side == 'side_src':
+                    line = line.strip().split('<<sep>>')
                 else:
                     line = line.strip().split()
                 if truncate:

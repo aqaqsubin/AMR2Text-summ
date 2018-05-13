@@ -177,7 +177,8 @@ def build_dataset(fields, data_type, src_path, tgt_path, src_dir=None,
                   dynamic_dict=True, sample_rate=0,
                   window_size=0, window_stride=0, window=None,
                   normalize_audio=True, use_filter_pred=True,
-                  side_path=None, phrase_table=None, global_phrase_table=None):
+                  side_src_path=None, side_tgt_path=None,
+                  phrase_table=None, global_phrase_table=None):
 
     # Build src/tgt examples iterator from corpus files, also extract
     # number of features.
@@ -192,12 +193,14 @@ def build_dataset(fields, data_type, src_path, tgt_path, src_dir=None,
         TextDataset.make_text_examples_nfeats_tpl(
             tgt_path, tgt_seq_length_trunc, "tgt")
 
-    side_examples_iter, _ = TextDataset.make_text_examples_nfeats_tpl(side_path, tgt_seq_length_trunc, "side")
+    side_tgt_examples_iter, _ = TextDataset.make_text_examples_nfeats_tpl(side_tgt_path, tgt_seq_length_trunc, "side_tgt")
+    side_src_examples_iter, _ = TextDataset.make_text_examples_nfeats_tpl(side_src_path, tgt_seq_length_trunc, "side_src")
     phrase_table_iter, _ = TextDataset.make_text_examples_nfeats_tpl(phrase_table, tgt_seq_length_trunc, "phrase_table")
 
     if data_type == 'text':
         dataset = TextDataset(fields, src_examples_iter, tgt_examples_iter,
-                              side_examples_iter, phrase_table_iter, global_phrase_table,
+                              side_src_examples_iter, side_tgt_examples_iter,
+                              phrase_table_iter, global_phrase_table,
                               num_src_feats=num_src_feats, num_tgt_feats=num_tgt_feats,
                               src_seq_length=src_seq_length,
                               tgt_seq_length=tgt_seq_length,

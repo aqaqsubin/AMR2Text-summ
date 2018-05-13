@@ -129,7 +129,7 @@ class Translator(object):
                 "log_probs": []}
 
     def translate(self, src_dir, src_path, tgt_path, phrase_table, global_phrase_table,
-                  batch_size, attn_debug=False, side_path=None, oracle=False):
+                  batch_size, attn_debug=False, side_src_path=None, side_tgt_path=None, oracle=False):
         data = onmt.io.build_dataset(self.fields,
                                      self.data_type,
                                      src_path,
@@ -140,7 +140,8 @@ class Translator(object):
                                      window_stride=self.window_stride,
                                      window=self.window,
                                      use_filter_pred=self.use_filter_pred,
-                                     side_path=side_path,
+                                     side_src_path=side_src_path,
+                                     side_tgt_path=side_tgt_path,
                                      phrase_table=phrase_table,
                                      global_phrase_table=global_phrase_table)
 
@@ -333,12 +334,13 @@ class Translator(object):
             # (c) Advance each beam.
 
             for j, b in enumerate(beam):
-                oracle_ngrams = None
+                ngrams = None
                 side_indices = None
-                if hasattr(batch, 'side'):
+                if hasattr(batch, 'side_src') and hasattr(batch, 'side_tgt'):
                     if oracle:
-                        gold = ['<s>'] + [self.fields['tgt'].vocab.itos[int(word)] for word in batch.tgt[:, j]
-                                if self.fields['tgt'].vocab.itos[int(word)] in batch.side[j]]
+                        side_tgt_words = [word for sent in batch.side_tgt[j] for word in sent.split()]
+                        gold = [self.fields['tgt'].vocab.itos[int(word)] for word in batch.tgt[:, j]
+                                if self.fields['tgt'].vocab.itos[int(word)] in side_tgt_words]
                         ngrams = NGram.NGram(gold, self.fields['tgt'].vocab)
                     else:
                         ngrams = NGram.NGram(batch.side[j], self.fields['tgt'].vocab)
