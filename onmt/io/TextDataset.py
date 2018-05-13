@@ -8,7 +8,7 @@ import sys
 
 import torch
 import torchtext
-
+from nltk.tokenize import sent_tokenize
 from onmt.Utils import aeq
 from onmt.io.DatasetBase import (ONMTDatasetBase, UNK_WORD,
                                  PAD_WORD, BOS_WORD, EOS_WORD)
@@ -197,6 +197,8 @@ class TextDataset(ONMTDatasetBase):
             for i, line in enumerate(corpus_file):
                 if side == 'phrase_table':
                     line = line.strip().split('\t')
+                elif side == 'side':
+                    line = ' '.join(['<s> ' + s for s in sent_tokenize(line)]).strip().split()
                 else:
                     line = line.strip().split()
                 if truncate:

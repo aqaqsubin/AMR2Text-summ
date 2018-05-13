@@ -1,4 +1,5 @@
 from __future__ import division
+import math
 import torch
 from onmt.translate import Penalties
 
@@ -70,7 +71,17 @@ class Beam(object):
         "Get the backpointers for the current timestep."
         return self.prev_ks[-1]
 
-    def advance(self, word_probs, attn_out, side_indices):
+    def get_denominator(self, i):
+        if i == 1:
+            return [1]
+        elif i == 2:
+            return [0.33, 0.67]
+        elif i == 3:
+            return [0.14, 0.28, 0.58]
+        elif i == 4:
+            return [0.07, 0.13, 0.27, 0.53]
+
+    def advance(self, word_probs, attn_out, side_indices, ngrams=None):
         """
         Given prob over words for every last beam `wordLk` and attention
         `attn_out`: Compute and update the beam search.
@@ -87,12 +98,30 @@ class Beam(object):
             self.global_scorer.update_score(self, attn_out)
         # force the output to be longer than self.min_length
         cur_len = len(self.next_ys)
-        if side_indices:
-            constraint = set(range(len(word_probs[0]))) - side_indices
-            for k in range(len(word_probs)):
-                # for i in constraint:
-                for i in side_indices:
-                    word_probs[k][i] = word_probs[k][i] + 1
+        if ngrams:
+            # Do addition to all beam
+            for b in range(word_probs.size(0)):
+                if cur_len > 1:
+                    hyp, _ = self.get_hyp(cur_len, b)
+                    hyp = [ngrams.vocab.stoi['<s>']] + hyp
+                else:
+                    hyp = [ngrams.vocab.stoi['<s>']]
+                for word in range(len(word_probs[b])):
+                    max_n_grams = 4
+                    if word in ngrams.ngram[1] and word != self.period:
+                        probs = 0
+                        hyp_len = min(cur_len, max_n_grams)
+                        for i in range(0, hyp_len):
+                            probs += ngrams.get_MLE_probs(word, hyp[-i - 1:]) * \
+                                     self.get_denominator(max_n_grams)[i]
+                        word_probs[b][word] = math.log(min(math.exp(word_probs[b][word]) + probs, 1))
+
+        # if side_indices:
+        #     constraint = set(range(len(word_probs[0]))) - side_indices
+        #     for k in range(len(word_probs)):
+        #         # for i in constraint:
+        #         for i in side_indices:
+        #             word_probs[k][i] = word_probs[k][i] + 1
         if cur_len < self.min_length:
             for k in range(len(word_probs)):
                 word_probs[k][self._eos] = -1e20
@@ -144,13 +173,13 @@ class Beam(object):
         self.global_scorer.update_global_state(self)
 
         for i in range(self.next_ys[-1].size(0)):
-            if self.next_ys[-1][i] == self._eos:
+            if self.next_ys[-1][i] == self._eos or self.next_ys[-1][i] == self.period:
                 global_scores = self.global_scorer.score(self, self.scores)
                 s = global_scores[i]
                 self.finished.append((s, len(self.next_ys) - 1, i))
 
         # End condition is when top-of-beam is EOS and no global score.
-        if self.next_ys[-1][0] == self._eos:
+        if self.next_ys[-1][0] == self._eos or self.next_ys[-1][0] == self.period:
             self.all_scores.append(self.scores)
             self.eos_top = True
 

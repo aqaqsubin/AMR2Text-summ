@@ -11,6 +11,7 @@ import onmt.ModelConstructor
 import onmt.translate.Beam
 import onmt.io
 import onmt.opts
+import onmt.modules.NGram as NGram
 
 
 def make_translator(opt, report_score=True, out_file=None):
@@ -332,20 +333,19 @@ class Translator(object):
             # (c) Advance each beam.
 
             for j, b in enumerate(beam):
+                oracle_ngrams = None
+                side_indices = None
                 if hasattr(batch, 'side'):
                     if oracle:
-                        gold = [word for word in data.examples[0].tgt if word in batch.side[j]]
-                        side_indices = set([self.fields['tgt'].vocab.stoi[k]
-                                        for k in gold
-                                        if k in self.fields['tgt'].vocab.itos])
+                        gold = ['<s>'] + [self.fields['tgt'].vocab.itos[int(word)] for word in batch.tgt[:, j]
+                                if self.fields['tgt'].vocab.itos[int(word)] in batch.side[j]]
+                        ngrams = NGram.NGram(gold, self.fields['tgt'].vocab)
                     else:
-                        side_indices = set([self.fields['tgt'].vocab.stoi[k]
-                                        for k in set(batch.side[j])
-                                        if k in self.fields['tgt'].vocab.itos])
+                        ngrams = NGram.NGram(batch.side[j], self.fields['tgt'].vocab)
                 else:
                     side_indices = None
                 b.advance(out[:, j],
-                          beam_attn.data[:, j, :memory_lengths[j]], side_indices)
+                          beam_attn.data[:, j, :memory_lengths[j]], side_indices, ngrams)
                 dec_states.beam_update(j, b.get_current_origin(), beam_size)
 
         # (4) Extract sentences from beam.
