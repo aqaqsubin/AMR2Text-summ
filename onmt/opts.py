@@ -379,6 +379,7 @@ def translate_opts(parser):
                        help='Path to model .pt file')
 
     group = parser.add_argument_group('Data')
+    group.add_argument('-lower', action='store_true', help='lowercase data')
     group.add_argument('-data_type', default="text",
                        help="Type of the source input. Options: [text|img].")
     group.add_argument('-side_src', help="Path to side information source.")
@@ -409,6 +410,9 @@ def translate_opts(parser):
                        help="Share source and target vocabulary")
 
     group = parser.add_argument_group('Beam')
+    group.add_argument("-psi", type=float, help="The rate of influence in guiding system.")
+    group.add_argument("-k", type=int, help="Top-k sentences to keep in side information.")
+    group.add_argument("-theta", type=float, help="Hyper-parameter for determining lambda.")
     group.add_argument('-beam_size',  type=int, default=5,
                        help='Beam size')
     group.add_argument('-min_length', type=int, default=0,

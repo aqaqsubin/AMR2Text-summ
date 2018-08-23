@@ -3,6 +3,7 @@ import torch
 import codecs
 import os
 import math
+import operator
 
 from torch.autograd import Variable
 from itertools import count
@@ -129,7 +130,8 @@ class Translator(object):
                 "log_probs": []}
 
     def translate(self, src_dir, src_path, tgt_path, phrase_table, global_phrase_table,
-                  batch_size, attn_debug=False, side_src_path=None, side_tgt_path=None, oracle=False):
+                  batch_size, attn_debug=False, side_src_path=None, side_tgt_path=None,
+                  oracle=False, lower=False, psi=0.95, theta=2, k=10):
         data = onmt.io.build_dataset(self.fields,
                                      self.data_type,
                                      src_path,
@@ -143,7 +145,8 @@ class Translator(object):
                                      side_src_path=side_src_path,
                                      side_tgt_path=side_tgt_path,
                                      phrase_table=phrase_table,
-                                     global_phrase_table=global_phrase_table)
+                                     global_phrase_table=global_phrase_table,
+                                     lower=lower)
 
         data_iter = onmt.io.OrderedIterator(
             dataset=data, device=self.gpu,
@@ -161,7 +164,7 @@ class Translator(object):
 
         all_scores = []
         for batch in data_iter:
-            batch_data = self.translate_batch(batch, data, oracle)
+            batch_data = self.translate_batch(batch, data, oracle, psi=psi, theta=theta, k=k)
             translations = builder.from_batch(batch_data)
 
             for trans in translations:
@@ -216,7 +219,30 @@ class Translator(object):
                       codecs.open(self.dump_beam, 'w', 'utf-8'))
         return all_scores
 
-    def translate_batch(self, batch, data, oracle=False):
+    def lcs(self, X, Y):
+        # find the length of the strings
+        m = len(X)
+        n = len(Y)
+
+        # declaring the array for storing the dp values
+        L = [[None] * (n + 1) for i in range(m + 1)]
+
+        """Following steps build L[m+1][n+1] in bottom up fashion
+        Note: L[i][j] contains length of LCS of X[0..i-1]
+        and Y[0..j-1]"""
+        for i in range(m + 1):
+            for j in range(n + 1):
+                if i == 0 or j == 0:
+                    L[i][j] = 0
+                elif X[i - 1] == Y[j - 1]:
+                    L[i][j] = L[i - 1][j - 1] + 1
+                else:
+                    L[i][j] = max(L[i - 1][j], L[i][j - 1])
+
+        # L[m][n] contains the length of LCS of X[0..n-1] & Y[0..m-1]
+        return L[m][n]
+
+    def translate_batch(self, batch, data, oracle=False, psi=0.95, theta=2, k=10):
         """
         Translate a batch of sentences.
 
@@ -343,11 +369,27 @@ class Translator(object):
                                 if self.fields['tgt'].vocab.itos[int(word)] in side_tgt_words]
                         ngrams = NGram.NGram(gold, self.fields['tgt'].vocab)
                     else:
-                        ngrams = NGram.NGram(batch.side[j], self.fields['tgt'].vocab)
+                        side_idxs = []
+                        for side_src in batch.side_src[j]:
+                            side_idx = []
+                            for item in side_src.strip().split():
+                                side_idx.append(self.fields['src'].vocab.stoi[item])
+                            side_idxs.append(side_idx)
+                        if batch_size > 1:
+                            src_idx = [int(item) for item in batch.src[0][j]]
+                        else:
+                            src_idx = [int(item) for item in batch.src[0]]
+                        lcs_arr = {i: self.lcs(side_idx, src_idx) for i, side_idx in enumerate(side_idxs)}
+                        top_lcs = [i for i, j in
+                                       sorted(lcs_arr.items(),
+                                              key=operator.itemgetter(1))[::-1][:min(k, len(lcs_arr))]]
+                        side_tgt_words = [word for idx, sent in enumerate(batch.side_tgt[j]) if idx in top_lcs
+                                          for word in sent.split()]
+                        ngrams = NGram.NGram(side_tgt_words, self.fields['tgt'].vocab)
                 else:
                     side_indices = None
                 b.advance(out[:, j],
-                          beam_attn.data[:, j, :memory_lengths[j]], side_indices, ngrams)
+                          beam_attn.data[:, j, :memory_lengths[j]], side_indices, ngrams, psi, theta)
                 dec_states.beam_update(j, b.get_current_origin(), beam_size)
 
         # (4) Extract sentences from beam.

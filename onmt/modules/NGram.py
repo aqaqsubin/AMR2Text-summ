@@ -20,14 +20,14 @@ class NGram(object):
 
     def get_MLE_probs(self, word, history=None):
         if history:
-            if tuple(history + [word]) in self.ngram[len(history) + 1]:
+            try:
                 if len(history) == 1:
                     result = self.ngram[len(history) + 1][tuple(history + [word])] / \
                              self.ngram[len(history)][history[0]]
                 else:
                     result = self.ngram[len(history) + 1][tuple(history + [word])] / \
                              self.ngram[len(history)][tuple(history)]
-            else:
+            except ZeroDivisionError:
                 result = 0
         else:
             result = self.ngram[1][word] / self.size

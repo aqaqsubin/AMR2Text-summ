@@ -78,7 +78,20 @@ class TextDataset(ONMTDatasetBase):
                 examples_iter = (self._join_dicts(src, tgt) for src, tgt in
                                  zip(src_examples_iter, tgt_examples_iter))
         else:
-            examples_iter = src_examples_iter
+            if side_tgt_examples_iter and side_src_examples_iter and phrase_table_iter:
+                examples_iter = (self._join_dicts(src, side_src, side_tgt, phrase_table)
+                                 for src, side_src, side_tgt, phrase_table in
+                                 zip(src_examples_iter, side_src_examples_iter,
+                                     side_tgt_examples_iter, phrase_table_iter))
+            elif side_tgt_examples_iter and side_src_examples_iter:
+                examples_iter = (self._join_dicts(src, side_src, side_tgt) for src, side_src, side_tgt in
+                                 zip(src_examples_iter,
+                                     side_src_examples_iter, side_tgt_examples_iter))
+            elif phrase_table_iter:
+                examples_iter = (self._join_dicts(src, phrase_table) for src, phrase_table in
+                             zip(src_examples_iter, phrase_table_iter))
+            else:
+                examples_iter = src_examples_iter
 
         if dynamic_dict:
             examples_iter = self._dynamic_dict(examples_iter)
@@ -155,7 +168,7 @@ class TextDataset(ONMTDatasetBase):
         return scores
 
     @staticmethod
-    def make_text_examples_nfeats_tpl(path, truncate, side):
+    def make_text_examples_nfeats_tpl(path, truncate, side, lower=False):
         """
         Args:
             path (str): location of a src or tgt file.
@@ -173,7 +186,7 @@ class TextDataset(ONMTDatasetBase):
         # All examples have same number of features, so we peek first one
         # to get the num_feats.
         examples_nfeats_iter = \
-            TextDataset.read_text_file(path, truncate, side)
+            TextDataset.read_text_file(path, truncate, side, lower)
 
         first_ex = next(examples_nfeats_iter)
         num_feats = first_ex[1]
@@ -185,7 +198,7 @@ class TextDataset(ONMTDatasetBase):
         return (examples_iter, num_feats)
 
     @staticmethod
-    def read_text_file(path, truncate=None, side=None):
+    def read_text_file(path, truncate=None, side=None, lower=False):
         """
         Args:
             path (str): location of a src or tgt file.
@@ -197,6 +210,8 @@ class TextDataset(ONMTDatasetBase):
         """
         with codecs.open(path, "r", "utf-8") as corpus_file:
             for i, line in enumerate(corpus_file):
+                if lower:
+                    line = line.lower()
                 if side == 'phrase_table':
                     line = line.strip().split('\t')
                 elif side == 'side_tgt':
@@ -330,7 +345,7 @@ class ShardedTextCorpusIterator(object):
     into (example_dict, n_features) tuples when iterates.
     """
     def __init__(self, corpus_path, line_truncate, side, shard_size,
-                 assoc_iter=None):
+                 assoc_iter=None, lower=False):
         """
         Args:
             corpus_path: the corpus file path.
@@ -348,7 +363,7 @@ class ShardedTextCorpusIterator(object):
         except IOError:
             sys.stderr.write("Failed to open corpus file: %s" % corpus_path)
             sys.exit(1)
-
+        self.lower = lower
         self.line_truncate = line_truncate
         self.side = side
         self.shard_size = shard_size
@@ -424,6 +439,8 @@ class ShardedTextCorpusIterator(object):
         return self.n_feats
 
     def _example_dict_iter(self, line, index):
+        if self.lower:
+            line = line.lower()
         line = line.split()
         if self.line_truncate:
             line = line[:self.line_truncate]
