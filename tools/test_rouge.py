@@ -18,8 +18,8 @@ def test_rouge(cand, ref):
             os.mkdir(tmp_dir)
             os.mkdir(tmp_dir + "/candidate")
             os.mkdir(tmp_dir + "/reference")
-        candidates = [line.strip() for line in cand]
-        references = [line.strip() for line in ref]
+        candidates = [line.strip() for line in open(cand, 'r')]
+        references = [line.strip() for line in open(ref, 'r')]
         assert len(candidates) == len(references)
         cnt = len(candidates)
         for i in range(cnt):
@@ -31,7 +31,9 @@ def test_rouge(cand, ref):
             with open(tmp_dir + "/reference/ref.{}.txt".format(i), "w",
                       encoding="utf-8") as f:
                 f.write(references[i])
-        r = pyrouge.Rouge155()
+        rouge_dir = '/opt/ROUGE'
+        rouge_args = '-e /opt/ROUGE/data -n 4 -m -2 4 -u -c 95 -r 1000 -f A -p 0.5 -t 0 -a -d'
+        r = pyrouge.Rouge155(rouge_dir, rouge_args)
         r.model_dir = tmp_dir + "/reference/"
         r.system_dir = tmp_dir + "/candidate/"
         r.model_filename_pattern = 'ref.#ID#.txt'
@@ -46,12 +48,11 @@ def test_rouge(cand, ref):
 
 
 def rouge_results_to_str(results_dict):
-    return ">> ROUGE(1/2/3/L/SU4): {:.2f}/{:.2f}/{:.2f}/{:.2f}/{:.2f}".format(
+    return ">> ROUGE(1/2/3/L/SU4): {:.2f}/{:.2f}/{:.2f}/{:.2f}".format(
         results_dict["rouge_1_f_score"] * 100,
         results_dict["rouge_2_f_score"] * 100,
         results_dict["rouge_3_f_score"] * 100,
-        results_dict["rouge_l_f_score"] * 100,
-        results_dict["rouge_su*_f_score"] * 100)
+        results_dict["rouge_l_f_score"] * 100)
 
 
 if __name__ == "__main__":
