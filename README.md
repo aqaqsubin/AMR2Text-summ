@@ -1,6 +1,6 @@
-# Guided Neural Language Generation
+# Guided Neural Language Generation for Abstractive Summarization Using AMR
 
-We are working on the documentation, and will be published before EMNLP 2018 event.
-
+A modification of OpenNMT for generating natural language sentence using source document as the side information.
+Paper is published at https://arxiv.org/abs/1808.09160
 
 
