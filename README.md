@@ -22,9 +22,9 @@ export F_TRAIN=/<path to AMR proxy train>/amr-release-2.0-amrs-training.txt
 export F_TEST=/<path to AMR proxy train>/amr-release-2.0-amrs-test.txt
 export F_DEV=/<path to AMR proxy train>/amr-release-2.0-amrs-dev.txt
 export OUTPUT=/<output path for the results>/
-python var_free_amrs.py -f $F_TRAIN -output_path $OUTPUT --custom_parentheses -no_semantics --delete_amr_var
-python var_free_amrs.py -f $F_TEST -output_path $OUTPUT --custom_parentheses -no_semantics --delete_amr_var
-python var_free_amrs.py -f $F_DEV -output_path $OUTPUT --custom_parentheses -no_semantics --delete_amr_var
+python var_free_amrs.py -f $F_TRAIN -output_path $OUTPUT --custom_parentheses --no_semantics --delete_amr_var
+python var_free_amrs.py -f $F_TEST -output_path $OUTPUT --custom_parentheses --no_semantics --delete_amr_var
+python var_free_amrs.py -f $F_DEV -output_path $OUTPUT --custom_parentheses --no_semantics --delete_amr_var
 ```
 
 For each set (train, test and dev) the script will produce a set of two files: the sentence (*.sent) and its respective linearized AMR (*.tf) files. 
